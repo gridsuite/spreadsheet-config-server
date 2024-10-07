@@ -86,6 +86,7 @@ jobs:
       - name: Rebase main onto this branch
         run: |
           git fetch
-          git rebase release-${{ github.ref_name }} main
+          git checkout main
+          git rebase release-${{ github.ref_name }}
           git push -f origin main
           git branch -D release-${{ github.ref_name }}
