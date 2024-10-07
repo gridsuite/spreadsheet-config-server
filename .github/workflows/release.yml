@@ -40,12 +40,11 @@ jobs:
         run: mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.${{ env.GITHUB_PATCH_VERSION }}
 
       - name: Commit and tag release version
-        uses: stefanzweifel/git-auto-commit-action@v5.0.1
-        with:
-          branch: release-${{ github.ref_name }}
-          create_branch: true
-          commit_message: Prepare release ${{ github.ref_name }}
-          tagging_message: ${{ github.ref_name }}
+        run: |
+          git checkout -b release-${{ github.ref_name }}
+          git add .
+          git commit -m "Prepare release ${{ github.ref_name }}"
+          git tag ${{ github.ref_name }}
 
       - name: Build with Maven
         run: mvn --batch-mode -Pjacoco verify
@@ -77,13 +76,11 @@ jobs:
       - name: Change Maven version to next version
         run: mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0-SNAPSHOT
 
-      - name: Commit next version
-        uses: stefanzweifel/git-auto-commit-action@v5.0.1
-        with:
-          branch: release-${{ github.ref_name }}
-          commit_message: Prepare next release v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0
-          skip_fetch: true
-          skip_checkout: true
+      - name: Commit and tag release version
+        run: |
+          git checkout -b release-${{ github.ref_name }}
+          git add .
+          git commit -m "Prepare next release v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0"
 
       - name: Rebase main onto this branch
         run: |
