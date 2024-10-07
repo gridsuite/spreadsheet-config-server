@@ -90,4 +90,5 @@ jobs:
           git checkout main
           git rebase release-${{ github.ref_name }}
           git push -f origin main
-          git branch -D release-${{ github.ref_name }}
+          git push origin release-${{ github.ref_name }}
+          git push origin ${{ github.ref_name }}
