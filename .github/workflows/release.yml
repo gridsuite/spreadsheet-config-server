@@ -85,17 +85,8 @@ jobs:
           skip_fetch: true
           skip_checkout: true
 
-      - name: Merge automatically into main branch
-        uses: devmasx/merge-branch@v1.4.0
-        with:
-          type: now
-          from_branch: release-${{ github.ref_name }}
-          target_branch: main
-          message: Automatic merge after release ${{ github.ref_name }}
-          github_token: ${{ secrets.REPO_ACCESS_TOKEN }}
-
-      - name: Delete merged branch
-        uses: dawidd6/action-delete-branch@v3.1.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branches: release-${{ github.ref_name }}
+      - name: Rebase main onto this branch
+        run: |
+          git checkout main
+          git rebase release-${{ github.ref_name }}
+          git branch -D release-${{ github.ref_name }}
