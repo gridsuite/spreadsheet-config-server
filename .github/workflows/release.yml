@@ -41,6 +41,8 @@ jobs:
 
       - name: Commit and tag release version
         run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.name "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b release-${{ github.ref_name }}
           git add .
           git commit -m "Prepare release ${{ github.ref_name }}"
