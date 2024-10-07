@@ -29,7 +29,7 @@ jobs:
       - name: Extract tag versions
         run: |
           regex="v([0-9]+).([0-9]+).([0-9]+)"
-          if [[ $1 =~ $regex ]]
+          if [[ ${{ github.ref_name }} =~ $regex ]]
           then
             echo "GITHUB_MAJOR_VERSION=${BASH_REMATCH[1]}" >> $GITHUB_ENV
             echo "GITHUB_MINOR_VERSION=${BASH_REMATCH[2]}" >> $GITHUB_ENV
