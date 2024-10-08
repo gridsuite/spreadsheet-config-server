@@ -7,9 +7,8 @@ on:
 
 jobs:
   build:
-
+    if: "!contains(github.event.head_commit.message, 'Release')"
     runs-on: ubuntu-latest
-
     steps:
       - name: Set up JDK 17
         uses: actions/setup-java@v1
@@ -46,7 +45,7 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b release-${{ github.ref_name }}
           git add .
-          git commit -m "Prepare release ${{ github.ref_name }}"
+          git commit -m "Release ${{ github.ref_name }}"
           git tag ${{ github.ref_name }}
 
       - name: Build with Maven
@@ -81,6 +80,7 @@ jobs:
 
       - name: Commit and tag release version
         run: |
+          git checkout -b next-release-v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0
           git add .
           git commit -m "Prepare next release v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0"
 
@@ -88,7 +88,7 @@ jobs:
         run: |
           git fetch
           git checkout main
-          git rebase release-${{ github.ref_name }}
+          git rebase next-release-v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0
           git push -f origin main
           git push origin release-${{ github.ref_name }}
           git push origin ${{ github.ref_name }}
