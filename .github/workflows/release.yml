@@ -84,14 +84,14 @@ jobs:
           -Djib.to.auth.password=${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Increment minor version
-        if: github.event.inputs.patch == 'true'
+        if: github.event.inputs.patch == 'false'
         run: |
           minor=${{ env.GITHUB_MINOR_VERSION }}
           ((minor++))
           echo "GITHUB_MINOR_VERSION=${minor}" >> $GITHUB_ENV
 
       - name: Update SNAPSHOT version on main
-        if: github.event.inputs.patch == 'true'
+        if: github.event.inputs.patch == 'false'
         run: |
           git checkout main
           mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0-SNAPSHOT
