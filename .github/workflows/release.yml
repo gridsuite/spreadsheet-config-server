@@ -4,15 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       releaseVersion:
-        description: Release version (vX.X.X)
+        description: Release version (vX.X)
         required: true
       commitSha:
         description: SHA of the commit from where to release
-        required: false
-      patch:
-        description: Whether or not it is a patch to a previous release
-        required: false
-        default: 'false'
+        required: true
 
 jobs:
   build:
@@ -31,24 +27,17 @@ jobs:
 
       - name: Extract tag versions
         run: |
-          regex="v([0-9]+).([0-9]+).([0-9]+)"
+          regex="v([0-9]+).([0-9]+)"
           if [[ ${{ github.event.inputs.releaseVersion }} =~ $regex ]]
           then
             echo "GITHUB_MAJOR_VERSION=${BASH_REMATCH[1]}" >> $GITHUB_ENV
             echo "GITHUB_MINOR_VERSION=${BASH_REMATCH[2]}" >> $GITHUB_ENV
-            echo "GITHUB_PATCH_VERSION=${BASH_REMATCH[3]}" >> $GITHUB_ENV
-            echo "GITHUB_SHORT_VERSION=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}" >> $GITHUB_ENV
+            echo "GITHUB_SHORT_VERSION=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.0" >> $GITHUB_ENV
           fi
 
       - name: Checkout with new branch
-        if: github.event.inputs.patch == 'false'
         run: |
           git checkout -b release/v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }} ${{ github.event.inputs.commitSha }}
-
-      - name: Checkout on existing release branch
-        if: github.event.inputs.patch == 'true'
-        run: |
-          git checkout release/v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}
 
       - name: Change Maven version to release version
         run: mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_SHORT_VERSION }}
@@ -58,10 +47,10 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Release ${{ github.event.inputs.releaseVersion }}"
-          git tag ${{ github.event.inputs.releaseVersion }}
+          git commit -m "Release v${{ env.GITHUB_SHORT_VERSION }}"
+          git tag v${{ env.GITHUB_SHORT_VERSION }}
           git push origin release/v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}
-          git push origin ${{ github.event.inputs.releaseVersion }}
+          git push origin v${{ env.GITHUB_SHORT_VERSION }}
 
       - name: Build with Maven
         run: mvn --batch-mode -Pjacoco verify
@@ -85,14 +74,12 @@ jobs:
           -Djib.to.auth.password=${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Increment minor version
-        if: github.event.inputs.patch == 'false'
         run: |
           minor=${{ env.GITHUB_MINOR_VERSION }}
           ((minor++))
           echo "GITHUB_MINOR_VERSION=${minor}" >> $GITHUB_ENV
 
       - name: Update SNAPSHOT version on main
-        if: github.event.inputs.patch == 'false'
         run: |
           git checkout main
           mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0-SNAPSHOT
