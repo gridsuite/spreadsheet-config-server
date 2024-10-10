@@ -1,13 +1,21 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      releaseVersion:
+        description: Release version (vX.X.X)
+        required: true
+      commitSha:
+        description: SHA of the commit from where to release
+        required: false
+      patch:
+        description: Whether or not it is a patch to a previous release
+        required: false
+        default: false
 
 jobs:
   build:
-    if: "!startsWith(github.event.head_commit.message, 'Release v') && github.event.base_ref == 'refs/heads/main'"
     runs-on: ubuntu-latest
     steps:
       - name: Set up JDK 17
@@ -19,34 +27,40 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.PAT }}
-
-      - name: Delete original tag
-        run: |
-          git tag -d ${{ github.ref_name }}
-          git push origin :refs/tags/${{ github.ref_name }}
 
       - name: Extract tag versions
         run: |
           regex="v([0-9]+).([0-9]+).([0-9]+)"
-          if [[ ${{ github.ref_name }} =~ $regex ]]
+          if [[ ${{ github.event.inputs.releaseVersion }} =~ $regex ]]
           then
             echo "GITHUB_MAJOR_VERSION=${BASH_REMATCH[1]}" >> $GITHUB_ENV
             echo "GITHUB_MINOR_VERSION=${BASH_REMATCH[2]}" >> $GITHUB_ENV
             echo "GITHUB_PATCH_VERSION=${BASH_REMATCH[3]}" >> $GITHUB_ENV
+            echo "GITHUB_SHORT_VERSION=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}" >> $GITHUB_ENV
           fi
 
+      - name: Checkout with new branch
+        if: ${{ github.event.inputs.patch }}
+        run: |
+          git checkout -b release-${{ github.event.inputs.releaseVersion }} ${{ github.event.inputs.commitSha }}
+
+      - name: Checkout on existing release branch
+        if: ${{ !github.event.inputs.patch }}
+        run: |
+          git checkout release-${{ github.event.inputs.releaseVersion }}
+
       - name: Change Maven version to release version
-        run: mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.${{ env.GITHUB_PATCH_VERSION }}
+        run: mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_SHORT_VERSION }}
 
       - name: Commit and tag release version
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b release-${{ github.ref_name }}
           git add .
-          git commit -m "Release ${{ github.ref_name }}"
-          git tag ${{ github.ref_name }}
+          git commit -m "Release ${{ github.event.inputs.releaseVersion }}"
+          git tag ${{ github.event.inputs.releaseVersion }}
+          git push origin release-${{ github.event.inputs.releaseVersion }}
+          git push origin ${{ github.event.inputs.releaseVersion }}
 
       - name: Build with Maven
         run: mvn --batch-mode -Pjacoco verify
@@ -65,30 +79,22 @@ jobs:
         run: >
           mvn --batch-mode deploy -DskipTests -Dmaven.install.skip -Dmaven.deploy.skip -Dpowsybl.docker.deploy
           -Djib.httpTimeout=60000
-          -Djib.to.image=docker.io/gridsuite/spreadsheet-config-server:${GITHUB_REF_NAME#v}
+          -Djib.to.image=docker.io/gridsuite/spreadsheet-config-server:${{ env.GITHUB_SHORT_VERSION }}
           -Djib.to.auth.username=gridsuiteci
           -Djib.to.auth.password=${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Increment minor version
+        if: ${{ !github.event.inputs.patch }}
         run: |
           minor=${{ env.GITHUB_MINOR_VERSION }}
           ((minor++))
           echo "GITHUB_MINOR_VERSION=${minor}" >> $GITHUB_ENV
 
-      - name: Change Maven version to next version
-        run: mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0-SNAPSHOT
-
-      - name: Commit and tag release version
+      - name: Update SNAPSHOT version on main
+        if: ${{ !github.event.inputs.patch }}
         run: |
-          git checkout -b next-release-v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0
-          git add .
-          git commit -m "Prepare next release v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0"
-
-      - name: Rebase main onto this branch
-        run: |
-          git fetch
           git checkout main
-          git rebase next-release-v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0
-          git push -f origin main
-          git push origin release-${{ github.ref_name }}
-          git push origin ${{ github.ref_name }}
+          mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0-SNAPSHOT
+          git add .
+          git commit -m "Update SNAPSHOT version to v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0"   
+          git push
