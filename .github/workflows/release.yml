@@ -12,7 +12,7 @@ on:
       patch:
         description: Whether or not it is a patch to a previous release
         required: false
-        default: false
+        default: 'false'
 
 jobs:
   build:
@@ -40,12 +40,12 @@ jobs:
           fi
 
       - name: Checkout with new branch
-        if: ${{ github.event.inputs.patch }}
+        if: github.event.inputs.patch == 'false'
         run: |
           git checkout -b release-${{ github.event.inputs.releaseVersion }} ${{ github.event.inputs.commitSha }}
 
       - name: Checkout on existing release branch
-        if: ${{ !github.event.inputs.patch }}
+        if: github.event.inputs.patch == 'true'
         run: |
           git checkout release-${{ github.event.inputs.releaseVersion }}
 
@@ -84,14 +84,14 @@ jobs:
           -Djib.to.auth.password=${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Increment minor version
-        if: ${{ !github.event.inputs.patch }}
+        if: github.event.inputs.patch == 'true'
         run: |
           minor=${{ env.GITHUB_MINOR_VERSION }}
           ((minor++))
           echo "GITHUB_MINOR_VERSION=${minor}" >> $GITHUB_ENV
 
       - name: Update SNAPSHOT version on main
-        if: ${{ !github.event.inputs.patch }}
+        if: github.event.inputs.patch == 'true'
         run: |
           git checkout main
           mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.0-SNAPSHOT
