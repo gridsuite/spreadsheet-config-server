@@ -1,13 +1,14 @@
 name: Patch
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      releaseVersion:
+        description: Patch version (vX.X)
+        required: true
 
 jobs:
   build:
-    if: "!startsWith(github.event.head_commit.message, 'Release v') && github.event.base_ref != 'refs/heads/main'"
     runs-on: ubuntu-latest
     steps:
       - name: Set up JDK 17
@@ -20,22 +21,38 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Delete original tag
+      - name: Checkout on existing release branch
         run: |
-          git tag -d ${{ github.ref_name }}
-          git push origin :refs/tags/${{ github.ref_name }}
+          git checkout release/${{ github.event.inputs.releaseVersion }}
+
+      - name: Extract tag versions
+        run: |
+          lastTag=$(git describe --tags --abbrev=0)
+          regex="v([0-9]+).([0-9]+).([0-9]+)"
+          if [[ $lastTag =~ $regex ]]
+          then
+            major=${BASH_REMATCH[1]}
+            minor=${BASH_REMATCH[2]}
+            patch=${BASH_REMATCH[3]}
+            ((patch++))
+            echo "GITHUB_MAJOR_VERSION=$major" >> $GITHUB_ENV
+            echo "GITHUB_MINOR_VERSION=$minor" >> $GITHUB_ENV
+            echo "GITHUB_PATCH_VERSION=$patch" >> $GITHUB_ENV
+            echo "GITHUB_SHORT_VERSION=$major.$minor.$patch" >> $GITHUB_ENV
+          fi
 
       - name: Change Maven version to release version
-        run: mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}.${{ env.GITHUB_PATCH_VERSION }}
+        run: mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_SHORT_VERSION }}
 
       - name: Commit and tag release version
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b ${{ github.event.base_ref }}
           git add .
-          git commit -m "Release ${{ github.ref_name }}"
-          git tag ${{ github.ref_name }}
+          git commit -m "Patched release v${{ env.GITHUB_SHORT_VERSION }}"
+          git tag v${{ env.GITHUB_SHORT_VERSION }}
+          git push origin release/v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}
+          git push origin v${{ env.GITHUB_SHORT_VERSION }}
 
       - name: Build with Maven
         run: mvn --batch-mode -Pjacoco verify
@@ -54,6 +71,6 @@ jobs:
         run: >
           mvn --batch-mode deploy -DskipTests -Dmaven.install.skip -Dmaven.deploy.skip -Dpowsybl.docker.deploy
           -Djib.httpTimeout=60000
-          -Djib.to.image=docker.io/gridsuite/spreadsheet-config-server:${GITHUB_REF_NAME#v}
+          -Djib.to.image=docker.io/gridsuite/spreadsheet-config-server:${{ env.GITHUB_SHORT_VERSION }}
           -Djib.to.auth.username=gridsuiteci
           -Djib.to.auth.password=${{ secrets.DOCKERHUB_TOKEN }}
