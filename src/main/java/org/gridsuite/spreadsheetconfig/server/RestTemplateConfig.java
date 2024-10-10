@@ -19,6 +19,7 @@ public class RestTemplateConfig {
 
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder coucou) {
+        // heehehehe
         return coucou.build();
     }
 }
