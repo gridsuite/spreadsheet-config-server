@@ -27,6 +27,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.PAT }}
 
       - name: Extract tag versions
         run: |
@@ -42,12 +43,12 @@ jobs:
       - name: Checkout with new branch
         if: github.event.inputs.patch == 'false'
         run: |
-          git checkout -b release-${{ github.event.inputs.releaseVersion }} ${{ github.event.inputs.commitSha }}
+          git checkout -b release/v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }} ${{ github.event.inputs.commitSha }}
 
       - name: Checkout on existing release branch
         if: github.event.inputs.patch == 'true'
         run: |
-          git checkout release-${{ github.event.inputs.releaseVersion }}
+          git checkout release/v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}
 
       - name: Change Maven version to release version
         run: mvn --batch-mode versions:set -DgenerateBackupPoms=false -DnewVersion=${{ env.GITHUB_SHORT_VERSION }}
@@ -59,7 +60,7 @@ jobs:
           git add .
           git commit -m "Release ${{ github.event.inputs.releaseVersion }}"
           git tag ${{ github.event.inputs.releaseVersion }}
-          git push origin release-${{ github.event.inputs.releaseVersion }}
+          git push origin release/v${{ env.GITHUB_MAJOR_VERSION }}.${{ env.GITHUB_MINOR_VERSION }}
           git push origin ${{ github.event.inputs.releaseVersion }}
 
       - name: Build with Maven
